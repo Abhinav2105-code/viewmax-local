@@ -1,0 +1,16 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+yt-dlp==2023.12.30
+assemblyai==0.20.0
+moviepy==1.0.3
+opencv-python==4.8.1.78
+numpy==1.24.3
+Pillow==10.0.0
+sqlalchemy==2.0.23
+sqlite3-python==1.0.0
+requests==2.31.0
+python-dotenv==1.0.0
+pydantic==2.4.2
+cors==1.0.1
+tailwind-ui==0.1.0

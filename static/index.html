@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ViewMax - Local Video Automation Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        .step-badge {
+            transition: all 0.3s ease;
+        }
+        .step-pending { @apply bg-gray-300 text-gray-700; }
+        .step-started { @apply bg-blue-400 text-white animate-pulse; }
+        .step-completed { @apply bg-green-500 text-white; }
+        .step-failed { @apply bg-red-500 text-white; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">🎬 ViewMax</h1>
+            <p class="text-purple-300 text-lg">Local AI-Powered YouTube Video Automation Engine</p>
+            <p class="text-sm text-gray-400 mt-2">Transform long-form videos into viral 9:16 vertical shorts with OpusClip-style captions</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Input Form (Left Panel) -->
+            <div class="lg:col-span-1">
+                <div class="bg-slate-800 border border-purple-500 rounded-lg p-6 sticky top-8">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <span class="text-purple-400">⚙️</span> New Project
+                    </h2>
+                    
+                    <form id="jobForm" class="space-y-4">
+                        <!-- Project Name -->
+                        <div>
+                            <label class="block text-sm font-semibold text-purple-300 mb-2">Project Name</label>
+                            <input type="text" id="projectName" placeholder="e.g., My First Clip" 
+                                class="w-full px-4 py-2 bg-slate-700 border border-purple-400 rounded text-white placeholder-gray-400 focus:outline-none focus:border-purple-300">
+                        </div>
+
+                        <!-- YouTube URL -->
+                        <div>
+                            <label class="block text-sm font-semibold text-purple-300 mb-2">YouTube URL</label>
+                            <input type="url" id="youtubeUrl" placeholder="https://youtube.com/watch?v=..." 
+                                class="w-full px-4 py-2 bg-slate-700 border border-purple-400 rounded text-white placeholder-gray-400 focus:outline-none focus:border-purple-300">
+                        </div>
+
+                        <!-- AssemblyAI API Key -->
+                        <div>
+                            <label class="block text-sm font-semibold text-purple-300 mb-2">AssemblyAI API Key</label>
+                            <input type="password" id="assemblyaiKey" placeholder="Your API key" 
+                                class="w-full px-4 py-2 bg-slate-700 border border-purple-400 rounded text-white placeholder-gray-400 focus:outline-none focus:border-purple-300">
+                            <p class="text-xs text-gray-400 mt-1">Get it from <a href="https://assemblyai.com" target="_blank" class="text-purple-400 hover:underline">assemblyai.com</a></p>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" id="submitBtn" 
+                            class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 rounded-lg transition-all duration-300 transform hover:scale-105">
+                            🚀 Start Processing
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Projects List & Status (Right Panels) -->
+            <div class="lg:col-span-2">
+                <!-- Current Job Status -->
+                <div id="statusPanel" class="hidden">
+                    <div class="bg-slate-800 border border-purple-500 rounded-lg p-6 mb-8">
+                        <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                            <span id="statusIcon" class="text-2xl">⏳</span>
+                            <span id="statusTitle">Processing...</span>
+                        </h2>
+                        
+                        <div class="bg-slate-700 rounded p-4 mb-6">
+                            <p class="text-sm text-gray-300 mb-2"><strong>Job ID:</strong> <span id="jobId" class="text-purple-300 font-mono">-</span></p>
+                            <p class="text-sm text-gray-300"><strong>Project:</strong> <span id="projectDisplay" class="text-purple-300">-</span></p>
+                        </div>
+
+                        <!-- Progress Steps -->
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-3 p-3 bg-slate-700 rounded">
+                                <div class="step-badge step-pending w-8 h-8 rounded flex items-center justify-center text-xs font-bold" data-step="download">1</div>
+                                <span class="flex-1">Video Download</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-slate-700 rounded">
+                                <div class="step-badge step-pending w-8 h-8 rounded flex items-center justify-center text-xs font-bold" data-step="transcribe">2</div>
+                                <span class="flex-1">Audio Transcription</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-slate-700 rounded">
+                                <div class="step-badge step-pending w-8 h-8 rounded flex items-center justify-center text-xs font-bold" data-step="detect">3</div>
+                                <span class="flex-1">Highlight Detection (Nemotron AI)</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-slate-700 rounded">
+                                <div class="step-badge step-pending w-8 h-8 rounded flex items-center justify-center text-xs font-bold" data-step="slice">4</div>
+                                <span class="flex-1">Video Slicing</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-slate-700 rounded">
+                                <div class="step-badge step-pending w-8 h-8 rounded flex items-center justify-center text-xs font-bold" data-step="reframe">5</div>
+                                <span class="flex-1">Smart Reframing (9:16 Vertical)</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-slate-700 rounded">
+                                <div class="step-badge step-pending w-8 h-8 rounded flex items-center justify-center text-xs font-bold" data-step="captions">6</div>
+                                <span class="flex-1">Caption Generation (OpusClip Style)</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-slate-700 rounded">
+                                <div class="step-badge step-pending w-8 h-8 rounded flex items-center justify-center text-xs font-bold" data-step="burn">7</div>
+                                <span class="flex-1">Caption Burning (FFmpeg)</span>
+                            </div>
+                        </div>
+
+                        <!-- Error Display -->
+                        <div id="errorBox" class="hidden mt-6 p-4 bg-red-900 border border-red-500 rounded">
+                            <p class="text-red-200 text-sm"><strong>Error:</strong> <span id="errorText"></span></p>
+                        </div>
+
+                        <!-- Download Button -->
+                        <button id="downloadBtn" class="hidden w-full mt-6 bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded-lg transition-all duration-300">
+                            ⬇️ Download Final Video
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Video Preview -->
+                <div id="previewPanel" class="hidden bg-slate-800 border border-purple-500 rounded-lg p-6 mb-8">
+                    <h2 class="text-xl font-bold mb-4">🎥 Video Preview</h2>
+                    <video id="videoPreview" controls class="w-full bg-black rounded" style="max-height: 400px;"></video>
+                </div>
+
+                <!-- Projects History -->
+                <div class="bg-slate-800 border border-purple-500 rounded-lg p-6">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                        <span>📋</span> Project History
+                    </h2>
+                    
+                    <div id="jobsList" class="space-y-3 max-h-96 overflow-y-auto">
+                        <div class="text-center text-gray-400 py-8">
+                            <p>No projects yet. Start by creating a new project!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let currentJobId = null;
+        let statusPollInterval = null;
+
+        // Map backend step names to UI step identifiers
+        const stepMapping = {
+            'Video Download': 'download',
+            'Audio Transcription': 'transcribe',
+            'Highlight Detection': 'detect',
+            'Video Slicing': 'slice',
+            'Smart Reframing': 'reframe',
+            'Caption Generation': 'captions',
+            'Caption Burning': 'burn',
+        };
+
+        // Form submission
+        document.getElementById('jobForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const projectName = document.getElementById('projectName').value.trim();
+            const youtubeUrl = document.getElementById('youtubeUrl').value.trim();
+            const assemblyaiKey = document.getElementById('assemblyaiKey').value.trim();
+
+            if (!projectName || !youtubeUrl || !assemblyaiKey) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            try {
+                const submitBtn = document.getElementById('submitBtn');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Submitting...';
+
+                const response = await fetch(`${API_BASE}/jobs/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        youtube_url: youtubeUrl,
+                        project_name: projectName,
+                        assemblyai_api_key: assemblyaiKey,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentJobId = data.job_id;
+                    document.getElementById('jobId').textContent = currentJobId;
+                    document.getElementById('projectDisplay').textContent = projectName;
+                    document.getElementById('statusPanel').classList.remove('hidden');
+                    document.getElementById('previewPanel').classList.add('hidden');
+                    document.getElementById('errorBox').classList.add('hidden');
+
+                    // Reset form
+                    document.getElementById('jobForm').reset();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '🚀 Start Processing';
+
+                    // Start polling status
+                    startStatusPolling();
+                    loadJobsList();
+                } else {
+                    alert('Error: ' + (data.detail || 'Failed to create job'));
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '🚀 Start Processing';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Network error: ' + error.message);
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').innerHTML = '🚀 Start Processing';
+            }
+        });
+
+        // Poll job status
+        function startStatusPolling() {
+            if (statusPollInterval) clearInterval(statusPollInterval);
+            pollStatus();
+            statusPollInterval = setInterval(pollStatus, 2000);
+        }
+
+        async function pollStatus() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/jobs/${currentJobId}/status`);
+                const job = await response.json();
+
+                // Update status title and icon
+                const statusTitle = document.getElementById('statusTitle');
+                const statusIcon = document.getElementById('statusIcon');
+
+                if (job.status === 'completed') {
+                    statusTitle.textContent = '✅ Completed Successfully!';
+                    statusIcon.textContent = '✅';
+                    clearInterval(statusPollInterval);
+                    document.getElementById('downloadBtn').classList.remove('hidden');
+                    document.getElementById('downloadBtn').onclick = () => downloadVideo(currentJobId);
+                    document.getElementById('previewPanel').classList.remove('hidden');
+                    loadVideoPreview(currentJobId);
+                } else if (job.status === 'failed') {
+                    statusTitle.textContent = '❌ Processing Failed';
+                    statusIcon.textContent = '❌';
+                    clearInterval(statusPollInterval);
+                    if (job.error_message) {
+                        document.getElementById('errorText').textContent = job.error_message;
+                        document.getElementById('errorBox').classList.remove('hidden');
+                    }
+                } else {
+                    statusIcon.textContent = '⏳';
+                }
+
+                // Update progress steps
+                if (job.progress_steps && job.progress_steps.length > 0) {
+                    job.progress_steps.forEach(step => {
+                        const stepKey = stepMapping[step.step_name];
+                        if (stepKey) {
+                            const badge = document.querySelector(`[data-step="${stepKey}"]`);
+                            if (badge) {
+                                badge.classList.remove('step-pending', 'step-started', 'step-completed', 'step-failed');
+                                if (step.status === 'started') {
+                                    badge.classList.add('step-started');
+                                } else if (step.status === 'completed') {
+                                    badge.classList.add('step-completed');
+                                } else if (step.status === 'failed') {
+                                    badge.classList.add('step-failed');
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Poll error:', error);
+            }
+        }
+
+        // Load and play video preview
+        async function loadVideoPreview(jobId) {
+            const video = document.getElementById('videoPreview');
+            video.src = `${API_BASE}/exports/${jobId}?t=${Date.now()}`;
+        }
+
+        // Download video
+        function downloadVideo(jobId) {
+            const link = document.createElement('a');
+            link.href = `${API_BASE}/exports/${jobId}`;
+            link.download = `video_${jobId}.mp4`;
+            link.click();
+        }
+
+        // Load jobs list
+        async function loadJobsList() {
+            try {
+                const response = await fetch(`${API_BASE}/jobs`);
+                const data = await response.json();
+                const jobsList = document.getElementById('jobsList');
+
+                if (data.jobs.length === 0) {
+                    jobsList.innerHTML = '<div class="text-center text-gray-400 py-8"><p>No projects yet.</p></div>';
+                } else {
+                    jobsList.innerHTML = data.jobs.map(job => `
+                        <div class="p-3 bg-slate-700 rounded cursor-pointer hover:bg-slate-600 transition" onclick="selectJob('${job.job_id}')">
+                            <p class="font-semibold text-purple-300">${job.project_name}</p>
+                            <p class="text-xs text-gray-400 truncate">${job.youtube_url}</p>
+                            <p class="text-xs mt-1 font-mono">
+                                <span class="inline-block px-2 py-1 rounded" style="background-color: ${getStatusColor(job.status)}">
+                                    ${job.status.toUpperCase()}
+                                </span>
+                            </p>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading jobs:', error);
+            }
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'pending': '#6b7280',
+                'downloading': '#3b82f6',
+                'transcribing': '#3b82f6',
+                'detecting_highlights': '#3b82f6',
+                'slicing': '#3b82f6',
+                'reframing': '#3b82f6',
+                'generating_captions': '#3b82f6',
+                'burning_captions': '#3b82f6',
+                'completed': '#10b981',
+                'failed': '#ef4444',
+            };
+            return colors[status] || '#6b7280';
+        }
+
+        function selectJob(jobId) {
+            currentJobId = jobId;
+            document.getElementById('statusPanel').classList.remove('hidden');
+            startStatusPolling();
+        }
+
+        // Initial load
+        loadJobsList();
+        setInterval(loadJobsList, 5000);
+    </script>
+</body>
+</html>
