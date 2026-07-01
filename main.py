@@ -26,7 +26,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import assemblyai as aai
 import requests
-from moviepy.editor import VideoFileClip, concatenate_videoclips
 
 # ==================== Configuration ====================
 
@@ -329,29 +328,38 @@ class HighlightDetector:
 
 
 class VideoSlicer:
-    """Extract video segment using MoviePy with memory-safe context handling"""
+    """Extract video segment using FFmpeg"""
     
     @staticmethod
     def slice_video(input_path: Path, output_path: Path, start_ms: int, end_ms: int) -> bool:
         """
-        Extract exact video segment between timestamps.
-        Uses MoviePy context manager to prevent memory leaks on large files.
+        Extract exact video segment between timestamps using FFmpeg.
         """
         try:
             start_sec = start_ms / 1000.0
-            end_sec = end_ms / 1000.0
+            duration_sec = (end_ms - start_ms) / 1000.0
             
-            # Context management for large video files
-            with VideoFileClip(str(input_path)) as video:
-                subclip = video.subclip(start_sec, end_sec)
-                # Write with codec optimization
-                subclip.write_videofile(
-                    str(output_path),
-                    codec='libx264',
-                    audio_codec='aac',
-                    verbose=False,
-                    logger=None,
-                )
+            ffmpeg_cmd = [
+                'ffmpeg',
+                '-i', str(input_path),
+                '-ss', str(start_sec),
+                '-t', str(duration_sec),
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-y',
+                str(output_path),
+            ]
+            
+            process = subprocess.Popen(
+                ffmpeg_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            
+            stdout, stderr = process.communicate(timeout=600)
+            
+            if process.returncode != 0:
+                raise Exception(f"FFmpeg slicing failed: {stderr.decode()}")
             
             return True
         except Exception as e:
